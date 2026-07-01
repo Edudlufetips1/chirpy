@@ -1,0 +1,10 @@
+# Binaries
+chirpy
+*.exe
+*.out
+
+# Environment variables (keep secrets safe!)
+.env
+
+# Go workspace file
+go.work.sum
