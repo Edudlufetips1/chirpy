@@ -17,8 +17,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", fs)))
 	mux.HandleFunc("GET /api/healthz", healthzHandler)
-	mux.HandleFunc("POST /admin/reset", cfg.resetHitCount)
 	mux.HandleFunc("GET /admin/metrics", cfg.numberOfRequests)
+	mux.HandleFunc("POST /admin/reset", cfg.resetHitCount)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
 
 	srv := &http.Server{
 		Addr:    ":8080",
