@@ -17,8 +17,8 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 		Body string `json:"body"`
 	}
 
-	type chirpValidResponse struct {
-		Valid bool `json:"valid"`
+	type chirpCleanedResponse struct {
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -45,8 +45,10 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := chirpValidResponse{
-		Valid: true,
+	filteredChirp := filterProfanity(requests.Body)
+
+	response := chirpCleanedResponse{
+		CleanedBody: filteredChirp,
 	}
 	jsonResponse, _ := json.Marshal(response)
 	w.WriteHeader(200)
