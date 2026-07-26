@@ -16,29 +16,42 @@ import (
 type apiConfig struct {
 	FileserverHits atomic.Int32
 	DBQueries      *database.Queries
+	Platform       string
 }
 
 func main() {
-	godotenv.Load()
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("Warning: error loading .env file: %v", err)
+	}
+
 	dbURL := os.Getenv("DB_URL")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
+
 	dbQueries := database.New(db)
+	platform := os.Getenv("PLATFORM")
+
+	log.Printf("Loaded PLATFORM: %q", platform)
 
 	cfg := &apiConfig{
 		DBQueries: dbQueries,
+		Platform:  platform,
 	}
+
 	fs := http.FileServer(http.Dir("./"))
 	mux := http.NewServeMux()
+
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app", fs)))
 	mux.HandleFunc("GET /api/healthz", healthzHandler)
 	mux.HandleFunc("GET /admin/metrics", cfg.numberOfRequests)
 	mux.HandleFunc("POST /admin/reset", cfg.resetHitCount)
 	mux.HandleFunc("POST /api/validate_chirp", cfg.handlerValidateChirp)
 	mux.HandleFunc("POST /api/users", cfg.handlerCreateUser)
+
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
@@ -65,31 +78,32 @@ func (cfg *apiConfig) numberOfRequests(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	hits := cfg.FileserverHits.Load()
 	template := `<html>
-		<body>
-			<h1>Welcome, Chirpy Admin</h1>
-			<p>Chirpy has been visited %d times!</p>
-		</body>
-		</html>`
+        <body>
+            <h1>Welcome, Chirpy Admin</h1>
+            <p>Chirpy has been visited %d times!</p>
+        </body>
+        </html>`
 	htmlResponse := fmt.Sprintf(template, hits)
 	w.Write([]byte(htmlResponse))
 }
 
 func (cfg *apiConfig) resetHitCount(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-
-	cfg.FileserverHits.Store(0)
-	w.Write([]byte("Hit count reset\n"))
-}
-
-// handlerValidateChirp is a placeholder HTTP handler to validate a chirp payload.
-// It is kept minimal to satisfy the route registration in main.
-func (cfg *apiConfig) handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	if cfg.Platform != "dev" {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("Forbidden"))
 		return
 	}
+
+	cfg.FileserverHits.Store(0)
+
+	err := cfg.DBQueries.DeleteAllUsers(r.Context())
+	if err != nil {
+		log.Printf("Error deleting users: %s", err)
+		respondWithError(w, http.StatusInternalServerError, "Could not delete users")
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("chirp validated"))
+	w.Write([]byte("Hit count reset\n"))
 }
