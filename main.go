@@ -37,8 +37,8 @@ func main() {
 	mux.HandleFunc("GET /api/healthz", healthzHandler)
 	mux.HandleFunc("GET /admin/metrics", cfg.numberOfRequests)
 	mux.HandleFunc("POST /admin/reset", cfg.resetHitCount)
-	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
-
+	mux.HandleFunc("POST /api/validate_chirp", cfg.handlerValidateChirp)
+	mux.HandleFunc("POST /api/users", cfg.handlerCreateUser)
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: mux,
@@ -80,4 +80,16 @@ func (cfg *apiConfig) resetHitCount(w http.ResponseWriter, r *http.Request) {
 
 	cfg.FileserverHits.Store(0)
 	w.Write([]byte("Hit count reset\n"))
+}
+
+// handlerValidateChirp is a placeholder HTTP handler to validate a chirp payload.
+// It is kept minimal to satisfy the route registration in main.
+func (cfg *apiConfig) handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("chirp validated"))
 }
