@@ -5,6 +5,9 @@ import (
 	"log"
 	"net/http"
 	"sync/atomic"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
@@ -12,6 +15,8 @@ type apiConfig struct {
 }
 
 func main() {
+	godotenv.Load()
+
 	cfg := &apiConfig{}
 	fs := http.FileServer(http.Dir("./"))
 	mux := http.NewServeMux()
