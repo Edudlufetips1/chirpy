@@ -24,10 +24,6 @@ type Queries struct {
 	db DBTX
 }
 
-func (q *Queries) GetChirps(context context.Context) (any, error) {
-	panic("unimplemented")
-}
-
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db: tx,
