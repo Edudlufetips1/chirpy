@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Edudlufetips1/chirpy/internal/auth"
 	"github.com/Edudlufetips1/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -20,8 +21,21 @@ type Chirp struct {
 
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	type ChirpRequest struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error retrieving token: %v", err)
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.JWTSecret)
+	if err != nil {
+		log.Printf("Error validating token: %v", err)
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -40,7 +54,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 
 	chirp, err := cfg.DBQueries.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   cleanedBody,
-		UserID: req.UserID,
+		UserID: userID,
 	})
 	if err != nil {
 		log.Printf("Error creating chirp: %v", err)
@@ -88,10 +102,30 @@ func (cfg *apiConfig) handlerGetChirpByID(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error retrieving token: %v", err)
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.JWTSecret)
+	if err != nil {
+		log.Printf("Error validating token: %v", err)
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	dbChirp, err := cfg.DBQueries.GetChirpByID(r.Context(), chirpID)
 	if err != nil {
 		log.Printf("Error retrieving chirp: %v", err)
 		respondWithError(w, http.StatusNotFound, "Could not retrieve chirp")
+		return
+	}
+
+	if dbChirp.UserID != userID {
+		log.Printf("User %s is not authorized to view chirp %s", userID, chirpID)
+		respondWithError(w, http.StatusForbidden, "Forbidden")
 		return
 	}
 

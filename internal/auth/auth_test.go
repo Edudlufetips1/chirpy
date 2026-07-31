@@ -121,3 +121,27 @@ func TestWrongTokenSecret(t *testing.T) {
 		t.Fatalf("Expected error validating JWT with wrong secret, got nil")
 	}
 }
+
+func TestGetBearerToken(t *testing.T) {
+	headers := make(map[string][]string)
+	headers["Authorization"] = []string{"Bearer mytoken"}
+	token, err := GetBearerToken(headers)
+	if err != nil {
+		t.Fatalf("Error getting bearer token: %v", err)
+	}
+	if token != "mytoken" {
+		t.Fatalf("Expected token 'mytoken', got '%s'", token)
+	}
+
+	headers["Authorization"] = []string{"InvalidHeader"}
+	_, err = GetBearerToken(headers)
+	if err == nil {
+		t.Fatalf("Expected error for invalid header format, got nil")
+	}
+
+	delete(headers, "Authorization")
+	_, err = GetBearerToken(headers)
+	if err == nil {
+		t.Fatalf("Expected error for missing authorization header, got nil")
+	}
+}
