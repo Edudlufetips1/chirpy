@@ -2,17 +2,18 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/Edudlufetips1/chirpy/internal/auth"
+	"github.com/Edudlufetips1/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email            string `json:"email"`
-		Password         string `json:"password"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -39,9 +40,6 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	expiresIn := time.Hour
-	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds <= 3600 {
-		expiresIn = time.Duration(params.ExpiresInSeconds) * time.Second
-	}
 
 	token, err := auth.MakeJWT(user.ID, cfg.JWTSecret, expiresIn)
 	if err != nil {
@@ -49,9 +47,27 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error generating refresh token")
+		return
+	}
+
+	_, err = cfg.DBQueries.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+	})
+
+	if err != nil {
+		log.Printf("Error storing refresh token: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Error storing refresh token")
+		return
+	}
 	respondWithJSON(w, http.StatusOK, struct {
-		User  User   `json:"user"`
-		Token string `json:"token"`
+		User         User   `json:"user"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}{
 		User: User{
 			ID:        user.ID,
@@ -59,6 +75,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: user.UpdatedAt,
 			Email:     user.Email,
 		},
-		Token: token,
+		Token:        token,
+		RefreshToken: refreshToken,
 	})
 }
