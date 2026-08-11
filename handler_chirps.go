@@ -102,6 +102,23 @@ func (cfg *apiConfig) handlerGetChirpByID(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	dbChirp, err := cfg.DBQueries.GetChirpByID(r.Context(), chirpID)
+	if err != nil {
+		log.Printf("Error retrieving chirp: %v", err)
+		respondWithError(w, http.StatusNotFound, "Could not retrieve chirp")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, Chirp{
+		ID:        dbChirp.ID,
+		CreatedAt: dbChirp.CreatedAt,
+		UpdatedAt: dbChirp.UpdatedAt,
+		Body:      dbChirp.Body,
+		UserID:    dbChirp.UserID,
+	})
+}
+
+func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
 	token, err := auth.GetBearerToken(r.Header)
 	if err != nil {
 		log.Printf("Error retrieving token: %v", err)
@@ -116,6 +133,15 @@ func (cfg *apiConfig) handlerGetChirpByID(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	chirpIDString := r.PathValue("chirpID")
+
+	chirpID, err := uuid.Parse(chirpIDString)
+	if err != nil {
+		log.Printf("Invalid chirp ID: %v", err)
+		respondWithError(w, http.StatusNotFound, "Invalid chirp ID")
+		return
+	}
+
 	dbChirp, err := cfg.DBQueries.GetChirpByID(r.Context(), chirpID)
 	if err != nil {
 		log.Printf("Error retrieving chirp: %v", err)
@@ -124,16 +150,17 @@ func (cfg *apiConfig) handlerGetChirpByID(w http.ResponseWriter, r *http.Request
 	}
 
 	if dbChirp.UserID != userID {
-		log.Printf("User %s is not authorized to view chirp %s", userID, chirpID)
+		log.Printf("User %s is not authorized to delete chirp %s", userID, chirpID)
 		respondWithError(w, http.StatusForbidden, "Forbidden")
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, Chirp{
-		ID:        dbChirp.ID,
-		CreatedAt: dbChirp.CreatedAt,
-		UpdatedAt: dbChirp.UpdatedAt,
-		Body:      dbChirp.Body,
-		UserID:    dbChirp.UserID,
-	})
+	err = cfg.DBQueries.DeleteChirpByID(r.Context(), chirpID)
+	if err != nil {
+		log.Printf("Error deleting chirp: %v", err)
+		respondWithError(w, http.StatusInternalServerError, "Could not delete chirp")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
