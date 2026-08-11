@@ -19,3 +19,8 @@ SELECT * FROM users WHERE email = $1;
 UPDATE users
 SET email = $1, hashed_password = $2, updated_at = CURRENT_TIMESTAMP
 WHERE id = $3;
+
+-- name: UpgradeUserToChirpyRed :exec
+UPDATE users
+SET is_chirpy_red = true, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1;

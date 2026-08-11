@@ -20,7 +20,7 @@ VALUES (
     $1,
     $2
 )
-RETURNING id, created_at, updated_at, email, hashed_password
+RETURNING id, created_at, updated_at, email, hashed_password, is_chirpy_red
 `
 
 type CreateUserParams struct {
@@ -37,6 +37,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
@@ -51,7 +52,7 @@ func (q *Queries) DeleteAllUsers(ctx context.Context) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, created_at, updated_at, email, hashed_password FROM users WHERE email = $1
+SELECT id, created_at, updated_at, email, hashed_password, is_chirpy_red FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -63,6 +64,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.IsChirpyRed,
 	)
 	return i, err
 }
@@ -81,5 +83,16 @@ type UpdateUserCredentialsParams struct {
 
 func (q *Queries) UpdateUserCredentials(ctx context.Context, arg UpdateUserCredentialsParams) error {
 	_, err := q.db.ExecContext(ctx, updateUserCredentials, arg.Email, arg.HashedPassword, arg.ID)
+	return err
+}
+
+const upgradeUserToChirpyRed = `-- name: UpgradeUserToChirpyRed :exec
+UPDATE users
+SET is_chirpy_red = true, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+func (q *Queries) UpgradeUserToChirpyRed(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, upgradeUserToChirpyRed, id)
 	return err
 }
